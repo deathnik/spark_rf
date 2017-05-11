@@ -342,7 +342,7 @@ public class DecisionTree extends AbstractClassifier {
 
     @Override
     public AbstractClassifier deserialize(String data) {
-        String[] parts = data.split(" ", 1);
+        String[] parts = data.split(" ", 2);
         DecisionTree dt = new DecisionTree(Integer.parseInt(parts[0]));
         dt.fromString(parts[1]);
         return dt;
