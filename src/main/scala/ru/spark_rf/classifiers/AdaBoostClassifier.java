@@ -40,17 +40,23 @@ public class AdaBoostClassifier {
         for (int i = 0; i < nObj; ++i) {
             w.add(1.0 / nObj);
         }
+        Object rdd = null;
+        if (sc != null) {
+            rdd = RDDhelper.gen(sc, x, w, y);
+        }
 
         for (int i = 0; i < nClassifiers; ++i) {
             ArrayList<Integer> predictedNow = new ArrayList<Integer>();
             MultipleDecisionTrees currentClf;
             if (sc == null) {
                 currentClf = new MultipleDecisionTrees(5);
+                currentClf.fit(x, w, y);
             } else {
-                currentClf = new ParallelMultipleDecisionTrees(5, sc);
+                ParallelMultipleDecisionTrees pmdf = new ParallelMultipleDecisionTrees(5, sc);
+                pmdf.fit(rdd);
+                currentClf = pmdf;
             }
 
-            currentClf.fit(x, w, y);
 
             clf.add(currentClf);
 

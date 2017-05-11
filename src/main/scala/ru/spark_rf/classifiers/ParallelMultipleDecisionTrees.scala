@@ -4,11 +4,22 @@ import java.lang.Double
 import java.util
 
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import ru.spark_rf.Util
 import ru.spark_rf.features.Feature
 
 import scala.collection.JavaConversions._
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
+
+object RDDhelper {
+  def gen(sc: SparkContext, x: util.ArrayList[util.ArrayList[Feature]], w: util.ArrayList[Double], y: util.ArrayList[Integer]): RDD[(util.ArrayList[Feature], Double, Integer)] = {
+    val data = (x, w, y).zipped.toList
+    sc.makeRDD(data)
+  }
+}
 
 object FittingMapper {
   def apply(inputIterator: Iterator[(util.ArrayList[Feature], Double, Integer)]): Iterator[String] = {
@@ -59,13 +70,25 @@ class ParallelMultipleDecisionTrees(nTrees: Int, reuseFactor: Double, sc: SparkC
       super.fit(x, w, y)
     } else {
       val data = (x, w, y).zipped.toList
-      val inputRdds = sc.makeRDD(data).randomSplit(Array.fill(this.nTrees)(1.0))
-      val trees = inputRdds.map(x => x.repartition(1).mapPartitions(FittingMapper.apply).collect()(0))
-      for (serializedTree <- trees) {
-        val tree: DecisionTree = new DecisionTree(0).deserialize(serializedTree).asInstanceOf[DecisionTree]
-        this.trees.add(tree)
-      }
+      val inputRdds: Object = sc.makeRDD(data).randomSplit(Array.fill(this.nTrees)(1.0))
+      fit(inputRdds)
     }
+  }
+
+  def fit(rdd1: Object): Unit = {
+    val rdd = rdd1.asInstanceOf[RDD[(util.ArrayList[Feature], Double, Integer)]]
+    val inputRdds = rdd.randomSplit(Array.fill(this.nTrees)(1.0))
+    val futures = inputRdds.map(x => Future {
+      x.repartition(1).mapPartitions(FittingMapper.apply).collect()(0)
+    })
+    val trees = futures.map(x => Await.result(x, 300.seconds))
+    //val inputRdds = sc.makeRDD(data).repartition(this.nTrees)
+    //val trees = inputRdds.mapPartitions(FittingMapper.apply).collect()
+    for (serializedTree <- trees) {
+      val tree: DecisionTree = new DecisionTree(0).deserialize(serializedTree).asInstanceOf[DecisionTree]
+      this.trees.add(tree)
+    }
+
   }
 
   def predict(dataset: java.util.ArrayList[java.util.ArrayList[Feature]]): java.util.ArrayList[Integer] = {
