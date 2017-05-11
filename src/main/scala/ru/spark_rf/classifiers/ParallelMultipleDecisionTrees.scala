@@ -8,6 +8,7 @@ import ru.spark_rf.Util
 import ru.spark_rf.features.Feature
 
 import scala.collection.JavaConversions._
+import scala.util.Random
 
 object FittingMapper {
   def apply(inputIterator: Iterator[(util.ArrayList[Feature], Double, Integer)]): Iterator[String] = {
@@ -39,8 +40,18 @@ class PredictingMapper(serializedTrees: String, soughtClass: Int) extends Serial
   }
 }
 
-class ParallelMultipleDecisionTrees(nTrees: Int, sc: SparkContext) extends MultipleDecisionTrees {
-  def this(nTrees: Int) = this(nTrees, null)
+class ParallelMultipleDecisionTrees(nTrees: Int, reuseFactor: Double, sc: SparkContext) extends MultipleDecisionTrees {
+  def this(nTrees: Int) = this(nTrees, 0.0, null)
+
+  def this(nTrees: Int, sc: SparkContext) = this(nTrees, 1.0, sc)
+
+  private def takeSample(originalData: List[(util.ArrayList[Feature], Double, Integer)], percent: Double): Array[(util.ArrayList[Feature], Double, Integer)] = {
+    val rnd = new Random(100500)
+    val arr = originalData.toArray
+    val new_size: Int = (arr.length.toFloat * percent.doubleValue).toInt
+    Array.fill(new_size)(arr(rnd.nextInt(arr.length)))
+
+  }
 
 
   override def fit(x: util.ArrayList[util.ArrayList[Feature]], w: util.ArrayList[Double], y: util.ArrayList[Integer]): Unit = {

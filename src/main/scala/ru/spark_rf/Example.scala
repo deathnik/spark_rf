@@ -10,7 +10,7 @@ object Example {
     val lines = try source.mkString finally source.close()
     val p = lines.split("\n").map(Runner.sonarInputParser).unzip
 
-    val parallel_tree = new ParallelMultipleDecisionTrees(10, sc)
+    val parallel_tree = new ParallelMultipleDecisionTrees(10, 2.5, sc)
     parallel_tree.fit(Util.toArrayList(p._1), Util.toArrayList(p._2))
 
     println(Util.toArrayList(p._2))
