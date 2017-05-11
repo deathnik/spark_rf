@@ -1,5 +1,6 @@
 package ru.spark_rf.classifiers;
 
+import org.apache.spark.SparkContext;
 import ru.spark_rf.features.CategoricalFeature;
 import ru.spark_rf.features.Feature;
 import ru.spark_rf.features.NumericalFeature;
@@ -7,13 +8,14 @@ import ru.spark_rf.features.NumericalFeature;
 import java.util.*;
 
 
-abstract public class AdaBoostClassifier extends AbstractClassifier {
+public class AdaBoostClassifier {
     public static final String SERIALIZE_DELIMITER = "^";
 
     private int nClassifiers;
 
     private ArrayList<MultipleDecisionTrees> clf;
     private ArrayList<Double> coef;
+    private SparkContext sc = null;
 
     public AdaBoostClassifier() {
         nClassifiers = 10;
@@ -23,7 +25,12 @@ abstract public class AdaBoostClassifier extends AbstractClassifier {
         nClassifiers = _nClassifiers;
     }
 
-    @Override
+    public AdaBoostClassifier(int _nClassifiers, SparkContext sc) {
+        nClassifiers = _nClassifiers;
+        this.sc = sc;
+    }
+
+    //@Override
     public void fit(ArrayList<ArrayList<Feature>> x, ArrayList<Integer> y) {
         int nObj = x.size();
         ArrayList<Double> w = new ArrayList<Double>();
@@ -36,7 +43,13 @@ abstract public class AdaBoostClassifier extends AbstractClassifier {
 
         for (int i = 0; i < nClassifiers; ++i) {
             ArrayList<Integer> predictedNow = new ArrayList<Integer>();
-            MultipleDecisionTrees currentClf = new MultipleDecisionTrees(5);
+            MultipleDecisionTrees currentClf;
+            if (sc == null) {
+                currentClf = new MultipleDecisionTrees(5);
+            } else {
+                currentClf = new ParallelMultipleDecisionTrees(5, sc);
+            }
+
             currentClf.fit(x, w, y);
 
             clf.add(currentClf);
@@ -82,7 +95,7 @@ abstract public class AdaBoostClassifier extends AbstractClassifier {
         }
     }
 
-    @Override
+    //@Override
     public int predict(ArrayList<Feature> x) {
         int nCl = clf.size();
         double sum0 = 0.0, sum1 = 0.0, sum = 0.0;
