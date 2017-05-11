@@ -24,7 +24,7 @@ public class MultipleDecisionTrees extends AbstractClassifier {
         trees = new ArrayList<DecisionTree>();
     }
 
-    public MultipleDecisionTrees() {
+    public  MultipleDecisionTrees() {
         init();
         nTrees = 10;
     }
@@ -73,7 +73,7 @@ public class MultipleDecisionTrees extends AbstractClassifier {
         ArrayList<ArrayList<Integer>> jobInputY = new ArrayList<ArrayList<Integer>>();
         ArrayList<ArrayList<Double>> jobInputW = new ArrayList<ArrayList<Double>>();
 
-        for (int i = 0; i < samplesNumber; ++i) {
+        for (int i = 0; i < nTrees; ++i) {
             jobInputX.add(new ArrayList<ArrayList<Feature>>());
             jobInputY.add(new ArrayList<Integer>());
             jobInputW.add(new ArrayList<Double>());
@@ -130,7 +130,7 @@ public class MultipleDecisionTrees extends AbstractClassifier {
 
     @Override
     public AbstractClassifier deserialize(String data) {
-        RandomForest clf = new RandomForest();
+        MultipleDecisionTrees clf = new MultipleDecisionTrees();
         String[] parts = data.split(TREE_DELIMITER);
         clf.nTrees = parts.length;
         ArrayList<DecisionTree> dtLst = new ArrayList<>();

@@ -3,48 +3,50 @@ package ru.spark_rf.classifiers;
 import ru.spark_rf.features.CategoricalFeature;
 import ru.spark_rf.features.Feature;
 import ru.spark_rf.features.NumericalFeature;
+
 import java.util.*;
 
 
 abstract public class AdaBoostClassifier extends AbstractClassifier {
+    public static final String SERIALIZE_DELIMITER = "^";
 
     private int nClassifiers;
-    
+
     private ArrayList<MultipleDecisionTrees> clf;
     private ArrayList<Double> coef;
-    
-    public AdaBoostClassifier () {
+
+    public AdaBoostClassifier() {
         nClassifiers = 10;
     }
-    
-    public AdaBoostClassifier (int _nClassifiers) {
+
+    public AdaBoostClassifier(int _nClassifiers) {
         nClassifiers = _nClassifiers;
     }
-    
+
     @Override
-    public void fit (ArrayList<ArrayList<Feature>> x, ArrayList<Integer> y) {
+    public void fit(ArrayList<ArrayList<Feature>> x, ArrayList<Integer> y) {
         int nObj = x.size();
         ArrayList<Double> w = new ArrayList<Double>();
         clf = new ArrayList<MultipleDecisionTrees>();
         coef = new ArrayList<Double>();
-        
-        for(int i = 0; i < nObj; ++i) {
+
+        for (int i = 0; i < nObj; ++i) {
             w.add(1.0 / nObj);
         }
-        
-        for(int i = 0; i < nClassifiers; ++i) {
+
+        for (int i = 0; i < nClassifiers; ++i) {
             ArrayList<Integer> predictedNow = new ArrayList<Integer>();
             MultipleDecisionTrees currentClf = new MultipleDecisionTrees(5);
             currentClf.fit(x, w, y);
-            
+
             clf.add(currentClf);
-            
+
             double pM = 0;
 
             double k0 = 0;
             double k1 = 0;
 
-            for(int j = 0; j < nObj; ++j) {
+            for (int j = 0; j < nObj; ++j) {
                 int cl = currentClf.predict(x.get(j));
                 predictedNow.add(cl);
                 if (y.get(j) != cl) {
@@ -57,12 +59,12 @@ abstract public class AdaBoostClassifier extends AbstractClassifier {
             pM /= 1.0 * nObj;
 
             System.out.println(pM + " " + 0.5 * Math.log((1.0 - pM) / pM) + " " + k0 + " " + k1);
-            
+
             coef.add(0.5 * Math.log((1.0 - pM) / pM));
-            
+
             double sumW = 0.0;
-            
-            for(int j = 0; j < nObj; ++j) {
+
+            for (int j = 0; j < nObj; ++j) {
                 double toExp;
                 if (y.get(j) == predictedNow.get(j)) {
                     toExp = -coef.get(i);
@@ -73,29 +75,30 @@ abstract public class AdaBoostClassifier extends AbstractClassifier {
                 w.set(j, newW);
                 sumW += newW;
             }
-            
-            for(int j = 0; j < nObj; ++j) {
+
+            for (int j = 0; j < nObj; ++j) {
                 w.set(j, w.get(j) / sumW);
             }
         }
     }
-    
+
     @Override
-    public int predict (ArrayList<Feature> x) {
+    public int predict(ArrayList<Feature> x) {
         int nCl = clf.size();
         double sum0 = 0.0, sum1 = 0.0, sum = 0.0;
-        for(int i = 0; i < nCl; ++i) {
+        for (int i = 0; i < nCl; ++i) {
             int pr = clf.get(i).predict(x);
             if (pr == 0) pr = -1;
             sum += pr * coef.get(i);
         }
-        if (sum < 0) return 0; else return 1;
+        if (sum < 0) return 0;
+        else return 1;
     }
 
-    public double predict_proba (ArrayList<Feature> x, Integer y) {
+    public double predict_proba(ArrayList<Feature> x, Integer y) {
         int nCl = clf.size();
         double sum0 = 0.0, sum1 = 0.0;
-        for(int i = 0; i < nCl; ++i) {
+        for (int i = 0; i < nCl; ++i) {
             int pr = clf.get(i).predict(x);
             double cf = coef.get(i);
             if (cf < 0) {
@@ -111,6 +114,6 @@ abstract public class AdaBoostClassifier extends AbstractClassifier {
 //        System.out.println(sum0 + " " + sum1);
         return sum1 / (sum0 + sum1);
     }
-    
-    
+
+
 }
