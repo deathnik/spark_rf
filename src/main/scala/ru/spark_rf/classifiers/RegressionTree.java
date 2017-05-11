@@ -6,45 +6,18 @@ import ru.spark_rf.features.NumericalFeature;
 
 import java.util.*;
 
-public class DecisionTree extends AbstractClassifier {
+
+public class RegressionTree {
 
     private int tree_max_depth;
 
-    public DecisionTree(int tree_max_depth) {
+    RegressionTree(int tree_max_depth) {
         this.tree_max_depth = tree_max_depth;
-    }
-
-    private Map<Integer, Double> get_count(ArrayList<Integer> input, ArrayList<Double> w) {
-        TreeMap<Integer, Double> count = new TreeMap<>();
-        for (int i = 0; i < input.size(); ++i) {
-            Integer y_curr = input.get(i);
-            Double w_curr = w.get(i);
-            if (count.containsKey(y_curr)) {
-                count.compute(y_curr, (k, v) -> v + w_curr);
-            } else {
-                count.put(y_curr, w_curr);
-            }
-        }
-        return count;
-    }
-
-    private int get_max_y(ArrayList<Integer> input, ArrayList<Double> w) {
-        Map<Integer, Double> count = get_count(input, w);
-        double max_val = -1;
-        int max_y = 1;
-        for (Map.Entry<Integer, Double> entry : count.entrySet()) {
-            if (entry.getValue() > max_val - 1e-6) {
-                max_val = entry.getValue();
-                max_y = entry.getKey();
-            }
-        }
-
-        return max_y;
     }
 
     private class Node {
         boolean is_leaf;
-        int value;
+        double value;
 
         int split_index;
         int null_side;
@@ -57,7 +30,7 @@ public class DecisionTree extends AbstractClassifier {
         Node left;
         Node right;
 
-        Node(int value) {
+        Node(double value) {
             is_leaf = true;
             this.value = value;
         }
@@ -97,22 +70,29 @@ public class DecisionTree extends AbstractClassifier {
 
     private Node root;
 
-    private double entropy(ArrayList<Integer> y, ArrayList<Double> w) {
-        Map<Integer, Double> count = get_count(y, w);
-
+    private double get_mean(ArrayList<Double> y, ArrayList<Double> w) {
+        double mean = 0;
         double w_sum = 0;
-        for (int i = 0; i < y.size(); ++i)
+        for (int i = 0; i < y.size(); ++i) {
+            mean += y.get(i) * w.get(i);
             w_sum += w.get(i);
-        double entropy = 0;
-        for (Map.Entry<Integer, Double> entry : count.entrySet()) {
-            double frequency = entry.getValue() / w_sum; //y.size();
-            entropy -= frequency * Math.log(frequency);
         }
-        return entropy;
+        return mean / w_sum;
+    }
+
+    private double variance(ArrayList<Double> y, ArrayList<Double> w) {
+        double mean = get_mean(y, w);
+        double temp = 0;
+        double w_sum = 0;
+        for (int i = 0; i < y.size(); ++i) {
+            temp += w.get(i) * (y.get(i) - mean) * (y.get(i) - mean);
+            w_sum += w.get(i);
+        }
+        return temp / w_sum;
     }
 
     private void TryMakeSplit(SplitConfig splitConfig, ArrayList<ArrayList<Feature>> x,
-                              ArrayList<Double> w, ArrayList<Integer> y, int i) {
+                              ArrayList<Double> w, ArrayList<Double> y, int i) {
         ArrayList<Feature> all_values = new ArrayList<>();
         for (ArrayList<Feature> aX : x) {
             all_values.add(aX.get(i));
@@ -144,8 +124,8 @@ public class DecisionTree extends AbstractClassifier {
                     previous_category = curr_category;
                 }
                 // [0 .. j] , [j + 1, ...]
-                ArrayList<Integer> left = new ArrayList<>();
-                ArrayList<Integer> right = new ArrayList<>();
+                ArrayList<Double> left = new ArrayList<>();
+                ArrayList<Double> right = new ArrayList<>();
                 ArrayList<Double> left_w = new ArrayList<>();
                 ArrayList<Double> right_w = new ArrayList<>();
                 ArrayList<Integer> l_indexes = new ArrayList<>();
@@ -185,8 +165,8 @@ public class DecisionTree extends AbstractClassifier {
                     }
                 }
 
-                double new_entropy = (sum_left * entropy(left, left_w) +
-                        sum_right * entropy(right, right_w)) / (sum_left + sum_right);
+                double new_entropy = (sum_left * variance(left, left_w) +
+                        sum_right * variance(right, right_w)) / (sum_left + sum_right);
                 if (new_entropy < splitConfig.best_entropy) {
                     splitConfig.best_entropy = new_entropy;
                     splitConfig.is_split = true;
@@ -201,8 +181,8 @@ public class DecisionTree extends AbstractClassifier {
                     }
                     splitConfig.left_indexes = l_indexes;
                     splitConfig.right_indexes = r_indexes;
-                    splitConfig.left_value = get_max_y(left, left_w);
-                    splitConfig.right_value = get_max_y(right, right_w);
+                    splitConfig.left_value = get_mean(left, left_w);
+                    splitConfig.right_value = get_mean(right, right_w);
                 }
             }
         }
@@ -216,8 +196,8 @@ public class DecisionTree extends AbstractClassifier {
         double x_value = 0;
         ArrayList<Integer> left_indexes = new ArrayList<>();
         ArrayList<Integer> right_indexes = new ArrayList<>();
-        int left_value = 1;
-        int right_value = 1;
+        double left_value = 1;
+        double right_value = 1;
         boolean is_categorical = false;
         int left_category = -1;
         int null_side = 0;
@@ -229,12 +209,12 @@ public class DecisionTree extends AbstractClassifier {
     }
 
     private void split_node(Node node, int max_depth, ArrayList<ArrayList<Feature>> x,
-                            ArrayList<Double> w, ArrayList<Integer> y) {
+                            ArrayList<Double> w, ArrayList<Double> y) {
         if (max_depth == 0) {
             return;
         }
 
-        SplitConfig splitConfig = new SplitConfig(entropy(y, w));
+        SplitConfig splitConfig = new SplitConfig(variance(y, w));
 
         for (int i = 0; i < x.get(0).size(); ++i) {
             TryMakeSplit(splitConfig, x, w, y, i);
@@ -247,7 +227,7 @@ public class DecisionTree extends AbstractClassifier {
     }
 
     private void make_split(Node node, SplitConfig splitConfig, int max_depth,
-                            ArrayList<ArrayList<Feature>> x, ArrayList<Double> w, ArrayList<Integer> y) {
+                            ArrayList<ArrayList<Feature>> x, ArrayList<Double> w, ArrayList<Double> y) {
 
         node.is_leaf = false;
         node.split_index = splitConfig.x_split;
@@ -265,8 +245,8 @@ public class DecisionTree extends AbstractClassifier {
         ArrayList<Double> w_left = new ArrayList<>();
         ArrayList<Double> w_right = new ArrayList<>();
 
-        ArrayList<Integer> y_left = new ArrayList<>();
-        ArrayList<Integer> y_right = new ArrayList<>();
+        ArrayList<Double> y_left = new ArrayList<>();
+        ArrayList<Double> y_right = new ArrayList<>();
         for (Integer left_index : splitConfig.left_indexes) {
             x_left.add(x.get(left_index));
             w_left.add(w.get(left_index));
@@ -281,7 +261,7 @@ public class DecisionTree extends AbstractClassifier {
         split_node(node.right, max_depth - 1, x_right, w_right, y_right);
     }
 
-    public void fit(ArrayList<ArrayList<Feature>> x, ArrayList<Integer> y) {
+    void fit(ArrayList<ArrayList<Feature>> x, ArrayList<Double> y) {
         ArrayList<Double> w = new ArrayList<>();
         for (int i = 0; i < y.size(); ++i) {
             w.add(1.);
@@ -289,9 +269,9 @@ public class DecisionTree extends AbstractClassifier {
         fit(x, w, y);
     }
 
-    public void fit(ArrayList<ArrayList<Feature>> x, ArrayList<Double> w, ArrayList<Integer> y) {
+    void fit(ArrayList<ArrayList<Feature>> x, ArrayList<Double> w, ArrayList<Double> y) {
 
-        int root_value = get_max_y(y, w);
+        double root_value = get_mean(y, w);
 
         root = new Node(root_value);
         root.is_leaf = true;
@@ -300,7 +280,7 @@ public class DecisionTree extends AbstractClassifier {
         split_node(root, max_depth, x, w, y);
     }
 
-    public int predict(ArrayList<Feature> x) {
+    double predict(ArrayList<Feature> x) {
         Node node = root;
         while (!node.is_leaf) {
             if (node.is_categorical_split) {
@@ -334,19 +314,6 @@ public class DecisionTree extends AbstractClassifier {
             }
         }
         return node.value;
-    }
-
-    @Override
-    public String serialize() {
-        return this.tree_max_depth + " " + this.toString();
-    }
-
-    @Override
-    public AbstractClassifier deserialize(String data) {
-        String[] parts = data.split(" ", 1);
-        DecisionTree dt = new DecisionTree(Integer.parseInt(parts[0]));
-        dt.fromString(parts[1]);
-        return dt;
     }
 
     private void addNode(Node node, ArrayList<Node> nodeInfos) {

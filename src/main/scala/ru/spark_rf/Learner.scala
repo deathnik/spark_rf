@@ -4,15 +4,16 @@ import java.util
 
 import org.apache.spark.rdd.RDD
 import ru.spark_rf.classifiers.AbstractClassifier
+import ru.spark_rf.features.Feature
 
 
 class Learner() extends java.io.Serializable {
   private def train[T <: AbstractClassifier](rdd: RDD[String], contructor: () => T,
-                                             inputParser: String => Pair[util.ArrayList[java.lang.Double], Integer],
+                                             inputParser: String => Pair[util.ArrayList[Feature], Integer],
                                              splitFactor: Int): RDD[String] = {
 
     def partitionMapper(inputIterator: Iterator[String]): Iterator[String] = {
-      val X = new util.ArrayList[util.ArrayList[java.lang.Double]]()
+      val X = new util.ArrayList[util.ArrayList[Feature]]()
       val Y = new util.ArrayList[Integer]()
       for (inputStr <- inputIterator) {
         val parsed = inputParser(inputStr)
@@ -28,7 +29,7 @@ class Learner() extends java.io.Serializable {
   }
 
   def fit[T <: AbstractClassifier](rdd: RDD[String], contructor: () => T,
-                                   inputParser: String => Pair[util.ArrayList[java.lang.Double], Integer],
+                                   inputParser: String => Pair[util.ArrayList[Feature], Integer],
                                    splitFactor: Int): Array[AbstractClassifier] = {
     val trainResult = train(rdd, contructor, inputParser, splitFactor)
     val fakeObject: T = contructor()
@@ -37,7 +38,7 @@ class Learner() extends java.io.Serializable {
   }
 
   def predict[T <: AbstractClassifier](rdd: RDD[String], contructor: () => T, serializedClassifier: String,
-                                       inputParser: String => util.ArrayList[java.lang.Double]): util.ArrayList[Integer] = {
+                                       inputParser: String => util.ArrayList[Feature]): util.ArrayList[Integer] = {
     def makePredictions(str: String): Integer = {
       val classifier = contructor().deserialize(serializedClassifier)
       classifier.predict(inputParser(str))
