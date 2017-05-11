@@ -38,7 +38,6 @@ public class DecisionTree extends AbstractClassifier {
                 max_y = entry.getKey();
             }
         }
-
         return max_y;
     }
 
